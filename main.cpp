@@ -8,10 +8,14 @@
 color ray_color(const ray& r)
 {
 	vec3 unit_direction = unit_vector(r.direction());
-	auto t = 0.5 * (unit_direction.y() + 1.0);
+	auto dy = 0.5 * (unit_direction.y() + 1.0);
+	auto dx = 0.5 * (unit_direction.x() + 1.0);
+
+	vec3 final_color =	(dy * color(1.0, 1.0, 1.0) + (1.0 - dy) * color(0.5, 0.7, 1.0)) *
+						(dx * color(1.0, 1.0, 1.0) + (1.0 - dx) * color(1.0, 0.7, 0.5));
 
 	// Blending the two colors using a simple linear lerp i guess depending on y
-	return (t) * color(1.0, 1.0, 1.0) + (1.0 - t) * color(0.5, 0.7, 1.0);
+	return final_color;
 }
 
 int main()
