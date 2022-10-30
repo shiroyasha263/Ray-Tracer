@@ -5,25 +5,34 @@
 #include <iostream>
 #include <math.h>
 
-bool hit_sphere(const point3& center, const double radius, const ray& r)
+double hit_sphere(const point3& center, const double radius, const ray& r)
 {
 	vec3 oc = r.orig - center;
-	auto a = dot(r.direction(), r.direction());
-	auto b = 2.0 * dot(oc, r.direction());
-	auto c = dot(oc, oc) - radius * radius;
-	auto discriminant = b * b - 4.0 * a * c;
-	return (discriminant > 0 && (-b / a) >= 0);
+	auto a = r.direction().length_squared();
+	auto half_b = dot(oc, r.direction());
+	auto c = oc.length_squared() - radius * radius;
+	auto discriminant = half_b * half_b - a * c;
+	if (discriminant < 0)
+		return -1.0;
+	else
+		return (-half_b - sqrt(discriminant)) / (a);
 }
 
 color ray_color(const ray& r)
 {
-	if (hit_sphere(point3(0, 0, -1), 0.5, r))
-		return color(1, 0, 0);
+	// Get the point at the sphere to shade it
+	auto t = hit_sphere(point3(0, 0, -1), 0.5, r);
+	if (t > 0.0)
+	{
+		vec3 N = unit_vector(r.at(t) - vec3(0, 0, -1));
+		return 0.5 * color(N.x() + 1, N.y() + 1, N.z() + 1);
+	}
+
 	vec3 unit_direction = unit_vector(r.direction());
-	auto t = 0.5 * (unit_direction.y() + 1.0);
+	t = 0.5 * (unit_direction.y() + 1.0);
 
 	// Blending the two colors using a simple linear lerp i guess depending on y
-	return (t) * color(1.0, 1.0, 1.0) + (1.0 - t) * color(0.5, 0.7, 1.0);
+	return (1.0 - t) * color(1.0, 1.0, 1.0) + (t) * color(0.5, 0.7, 1.0);
 }
 
 int main()
@@ -54,7 +63,7 @@ int main()
 
 	std::cout << "P3\n" << img_width << ' ' << img_height << "\n255\n";
 
-	for (int j = 0; j < img_height; ++j)
+	for (int j = img_height; j >= 0; --j)
 	{
 		std::cerr << "\r Scanline remaining: " << j << ' ' << std::flush;
 		for (int i = 0; i < img_width; ++i)
