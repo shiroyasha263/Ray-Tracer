@@ -1,38 +1,27 @@
-#include"color.h"
-#include "ray.h"
-#include "vec3.h"
+#include "rtweekend.h"
+
+#include "color.h"
+#include "hittable_list.h"
+#include "sphere.h"
+#include "camera.h"
 
 #include <iostream>
-#include <math.h>
 
-double hit_sphere(const point3& center, const double radius, const ray& r)
-{
-	vec3 oc = r.orig - center;
-	auto a = r.direction().length_squared();
-	auto half_b = dot(oc, r.direction());
-	auto c = oc.length_squared() - radius * radius;
-	auto discriminant = half_b * half_b - a * c;
-	if (discriminant < 0)
-		return -1.0;
-	else
-		return (-half_b - sqrt(discriminant)) / (a);
-}
+color ray_color(const ray& r, const hittable& world, int depth) {
+	hit_record rec;
 
-color ray_color(const ray& r)
-{
-	// Get the point at the sphere to shade it
-	auto t = hit_sphere(point3(0, 0, -1), 0.5, r);
-	if (t > 0.0)
-	{
-		vec3 N = unit_vector(r.at(t) - vec3(0, 0, -1));
-		return 0.5 * color(N.x() + 1, N.y() + 1, N.z() + 1);
+	// If we've exceeded the ray bounce limit, no more light is gathered.
+	if (depth <= 0)
+		return color(0, 0, 0);
+
+	if (world.hit(r, 0.001, infinity, rec)) {
+		point3 target = rec.p + rec.normal + random_unit_vector();
+		return 0.5 * ray_color(ray(rec.p, target - rec.p), world, depth - 1);
 	}
 
 	vec3 unit_direction = unit_vector(r.direction());
-	t = 0.5 * (unit_direction.y() + 1.0);
-
-	// Blending the two colors using a simple linear lerp i guess depending on y
-	return (1.0 - t) * color(1.0, 1.0, 1.0) + (t) * color(0.5, 0.7, 1.0);
+	auto t = 0.5 * (unit_direction.y() + 1.0);
+	return (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
 }
 
 int main()
@@ -43,39 +32,37 @@ int main()
 	const auto aspect_ratio = 16.0 / 9;
 	const int img_width = 400;
 	const int img_height = static_cast<int>(img_width / aspect_ratio);
+	const int samples_per_pixel = 100;
+	const int max_depth = 50;
+
+	// World
+
+	hittable_list world;
+	world.add(make_shared<sphere>(point3(0, 0, -1), 0.5));
+	world.add(make_shared<sphere>(point3(0, -100.5, -1), 100));
 
 	// Camera
-	// Creates the values of the viewport (can be anything to be honest but we went with this height = 2, at distance of 2 from the centre)
-	auto viewport_height = 2.0;
-	auto viewport_width = aspect_ratio * viewport_height;
-	auto focal_length = 1.0;
-
-	//creates the origin
-	auto origin = point3();
-	//creates the horizontal vector that is the length of the viewport
-	auto horizontal = vec3(viewport_width, 0, 0);
-	//creates the vertical vector that is the length of the viewport
-	auto vertical = vec3(0, viewport_height, 0);
-	//creates the vector that points at the lower left corner of our view port
-	auto lower_left_corner = origin - horizontal / 2 - vertical / 2 - vec3(0, 0, focal_length);
+	camera cam;
 
 	// Render
 
 	std::cout << "P3\n" << img_width << ' ' << img_height << "\n255\n";
 
-	for (int j = img_height; j >= 0; --j)
+	for (int j = img_height - 1; j >= 0; --j)
 	{
 		std::cerr << "\r Scanline remaining: " << j << ' ' << std::flush;
 		for (int i = 0; i < img_width; ++i)
 		{
-			auto u = double(i) / (img_width - 1);
-			auto v = double(j) / (img_height - 1);
-			ray r(origin, lower_left_corner + u * horizontal + v * vertical - origin);
-			color pixel_color = ray_color(r);
-
-			write_color(std::cout, pixel_color);
+			color pixel_color(0, 0, 0);
+			for (int s = 0; s < samples_per_pixel; ++s)
+			{
+				auto u = (i + random_double()) / (img_width - 1);
+				auto v = (j + random_double()) / (img_height - 1);
+				ray r = cam.get_ray(u, v);
+				pixel_color += ray_color(r, world, max_depth);
+			}
+			write_color(std::cout, pixel_color, samples_per_pixel);
 		}
 	}
-
 	std::cerr << "\n Done. \n";
 }
