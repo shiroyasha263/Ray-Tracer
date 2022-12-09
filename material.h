@@ -27,7 +27,7 @@ public:
 			scatter_direction = rec.normal;
 		}
 
-		scattered = ray(rec.p, scatter_direction);
+		scattered = ray(rec.p, scatter_direction, ray_in.time());
 		attenuation = albedo;
 		return true;
 	}
@@ -45,7 +45,7 @@ public:
 	) const override {
 		auto reflected_direction = reflect(ray_in.direction() + fuzz * random_in_hemisphere(ray_in.direction()), rec.normal);
 
-		scattered = ray(rec.p, reflected_direction);
+		scattered = ray(rec.p, reflected_direction, ray_in.time());
 		attenuation = albedo;
 		return (dot(scattered.direction(), rec.normal) > 0);
 	}
@@ -80,7 +80,7 @@ public:
 		else
 			direction = refract(unit_direction, rec.normal, refraction_ratio);
 
-		scattered = ray(rec.p, direction);
+		scattered = ray(rec.p, direction, ray_in.time());
 		return true;
 	}
 
