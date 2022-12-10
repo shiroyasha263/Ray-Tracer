@@ -10,24 +10,25 @@
 
 #include <iostream>
 
-color ray_color(const ray& r, const hittable& world, int depth) {
+color ray_color(const ray& r, const color& background, const hittable& world, int depth) {
 	hit_record rec;
 
 	// If we've exceeded the ray bounce limit, no more light is gathered.
 	if (depth <= 0)
 		return color(0, 0, 0);
 
-	if (world.hit(r, 0.001, infinity, rec)) {
-		ray scattered;
-		color attenuation;
-		if (rec.mat_ptr->scatter(r, rec, attenuation, scattered))
-			return attenuation * ray_color(scattered, world, depth - 1);
-		return color(0, 0, 0);
-	}
+	//If ray hits nothing, return background color
+	if (!world.hit(r, 0.001, infinity, rec))
+		return background;
 
-	vec3 unit_direction = unit_vector(r.direction());
-	auto t = 0.5 * (unit_direction.y() + 1.0);
-	return (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
+	ray scattered;
+	color attenuation;
+	color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+
+	if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered))
+		return emitted;
+
+	return emitted + attenuation * ray_color(scattered, background, world, depth - 1);
 }
 
 
@@ -84,6 +85,39 @@ hittable_list random_scene() {
 	return BVH;
 }
 
+hittable_list two_spheres() {
+	hittable_list BVH;
+	hittable_list objects;
+
+	auto checker = make_shared<checker_texture>(color(0.2, 0.3, 0.1), color(0.9, 0.9, 0.9));
+
+	objects.add(make_shared<sphere>(point3(0, -10, 0), 10, make_shared<lambertian>(checker)));
+	objects.add(make_shared<sphere>(point3(0, 10, 0), 10, make_shared<lambertian>(checker)));
+
+	BVH.add(make_shared<bvh_node>(objects, 0, 1));
+	return objects;
+}
+
+hittable_list two_perlin_sphere() {
+	hittable_list BVH;
+	hittable_list objects;
+
+	auto pertex = make_shared<noise_texture>(4);
+
+	objects.add(make_shared<sphere>(point3(0, -1000, 0), 1000, make_shared<lambertian>(pertex)));
+	objects.add(make_shared<sphere>(point3(0, 2, 0), 2, make_shared<lambertian>(pertex)));
+
+	BVH.add(make_shared<bvh_node>(objects, 0, 1));
+	return objects;
+}
+
+hittable_list earth() {
+	auto earth_texture = make_shared<image_texture>("earthmap.jpg");
+	auto earth_surface = make_shared<lambertian>(earth_texture);
+	auto globe = make_shared<sphere>(point3(0, 0, 0), 2, earth_surface);
+
+	return hittable_list(globe);
+}
 
 int main()
 {
@@ -97,18 +131,54 @@ int main()
 	const int max_depth = 50;
 
 	// World
+	hittable_list world;
 
-	auto world = random_scene();
+	point3 lookfrom;
+	point3 lookat;
+	auto vfov = 40;
+	auto aperture = 0.0;
+	color background(0, 0, 0);
+
+	switch (0){
+	case 1:
+		world = random_scene();
+		background = color(0.7, 0.8, 1.0);
+		lookfrom = point3(13, 2, 3);
+		lookat = point3(0, 0, 0);
+		vfov = 20.0;
+		aperture = 0.1;
+		break;
+	case 2:
+		world = two_spheres();
+		background = color(0.7, 0.8, 1.0);
+		lookfrom = point3(13, 2, 3);
+		lookat = point3(0, 0, 0);
+		vfov = 20.0;
+		break;
+	case 3:
+		world = two_perlin_sphere();
+		background = color(0.7, 0.8, 1.0);
+		lookfrom = point3(13, 2, 3);
+		lookat = point3(0, 0, 0);
+		vfov = 20;
+		break;
+	case 4:
+		world = earth();
+		lookfrom = point3(13, 2, 3);
+		lookat = point3(0, 0, 0);
+		vfov = 20.0;
+		break;
+	default:
+	case 5:
+		background = color(0, 0, 0);
+		break;
+	}
 
 	// Camera
-
-	point3 lookfrom(13, 2, 3);
-	point3 lookat(0, 0, 0);
 	vec3 vup(0, 1, 0);
 	auto dist_to_focus = 10.0;
-	auto aperture = 0.1;
 
-	camera cam(lookfrom, lookat, vup, 20, aspect_ratio, aperture, dist_to_focus, 0.0, 1.0);
+	camera cam(lookfrom, lookat, vup, vfov, aspect_ratio, aperture, dist_to_focus, 0.0, 1.0);
 
 	// Render
 
@@ -125,7 +195,7 @@ int main()
 				auto u = (i + random_double()) / (img_width - 1);
 				auto v = (j + random_double()) / (img_height - 1);
 				ray r = cam.get_ray(u, v);
-				pixel_color += ray_color(r, world, max_depth);
+				pixel_color += ray_color(r, background, world, max_depth);
 			}
 			write_color(std::cout, pixel_color, samples_per_pixel);
 		}
