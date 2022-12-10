@@ -8,6 +8,7 @@
 #include "material.h"
 #include "moving_sphere.h"
 #include "bvh.h"
+#include "box.h"
 
 #include <iostream>
 
@@ -137,6 +138,7 @@ hittable_list simple_light() {
 }
 
 hittable_list cornell_box() {
+	hittable_list BVH;
 	hittable_list objects;
 
 	auto red = make_shared<lambertian>(color(.65, .05, .05));
@@ -151,7 +153,19 @@ hittable_list cornell_box() {
 	objects.add(make_shared<xz_rect>(0, 555, 0, 555, 555, white));
 	objects.add(make_shared<xy_rect>(0, 555, 0, 555, 555, white));
 
-	return objects;
+	shared_ptr<hittable> box1 = make_shared<box>(point3(0, 0, 0), point3(165, 330, 165), white);
+	box1 = make_shared<rotate_y>(box1, 15);
+	box1 = make_shared<translate>(box1, vec3(265, 0, 295));
+	objects.add(box1);
+
+	shared_ptr<hittable> box2 = make_shared<box>(point3(0, 0, 0), point3(165, 165, 165), white);
+	box2 = make_shared<rotate_y>(box2, -18);
+	box2 = make_shared<translate>(box2, vec3(130, 0, 65));
+	objects.add(box2);
+
+	BVH.add(make_shared<bvh_node>(objects, 0, 1));
+
+	return BVH;
 }
 
 int main()
